@@ -191,6 +191,7 @@ redfin_label_api/
 │   │   ├── extract_category.py  # 카테고리 분류
 │   │   ├── extract_keywords.py  # 키워드 추출
 │   │   ├── extract_tags.py      # 태그 생성
+│   │   ├── tag_cleaner.py       # 태그 전처리 
 │   │   └── mongo_simple.py      # MongoDB 연동
 │   └── core/                    # 설정 및 의존성
 ├── data/                        # 데이터 파일
