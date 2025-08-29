@@ -1,0 +1,102 @@
+# Git 관련
+.git
+.gitignore
+.gitattributes
+
+# Python 관련
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# 가상환경
+.venv
+venv/
+ENV/
+env/
+.venv/
+
+# IDE 관련
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS 관련
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 프로젝트 특정
+data/output/
+logs/
+*.log
+.env
+.env.local
+.env.production
+
+# 테스트 관련
+tests/
+test_*.py
+pytest.ini
+.pytest_cache/
+
+# 노트북
+notebooks/
+*.ipynb
+.ipynb_checkpoints/
+
+# 문서
+README.md
+docs/
+*.md
+
+# Docker 관련
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# 개발 도구
+Makefile
+scripts/
+.github/
+
+# 임시 파일
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# 데이터 파일 (대용량)
+Data/
+*.csv
+*.jsonl
+*.json.gz
+*.parquet
+
+# 모델 파일
+*.pkl
+*.joblib
+*.h5
+*.onnx
