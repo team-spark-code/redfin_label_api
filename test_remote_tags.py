@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-원격 Ollama 서버로 태그 추출 테스트
+원격 Ollama 서버로 태그 추출 + 정제 테스트
 """
 
 from app.services.extract_tags import get_tags_with_ollama, controlled_vocab
 from app.services.mongo_simple import mongo
+from app.services.tag_cleaner import clean_tags_entry  # ⬅️ 추가
 
 
 def test_remote_tagging():
-    """원격 서버로 태그 추출 테스트"""
-    print("=== 원격 Ollama 서버 태그 추출 테스트 ===")
+    """원격 서버로 태그 추출 및 정제 테스트"""
+    print("=== 원격 Ollama 서버 태그 추출 + 정제 테스트 ===")
     
     # 처리된 엔트리 중 하나 가져오기
     entries = mongo.get_rss_entries(limit=1, filter_dict={'processed': True})
@@ -39,17 +40,20 @@ def test_remote_tagging():
     for model in models:
         print(f"\n🤖 모델: {model}")
         try:
-            tags = get_tags_with_ollama(
+            raw_tags = get_tags_with_ollama(
                 title=title,
                 content=content,
-                yake_keywords=keywords[:5],  # 상위 5개 키워드만 사용
+                yake_keywords=keywords[:5],
                 vocab=controlled_vocab,
                 model_name=model,
                 server_name="remote"
             )
             
-            if tags:
-                print(f"✅ 추출된 태그 ({len(tags)}개): {tags}")
+            if raw_tags:
+                # ✅ 정제 과정 추가
+                cleaned_tags = clean_tags_entry(raw_tags)
+                print(f"🟡 원본 태그 ({len(raw_tags)}개): {raw_tags}")
+                print(f"✅ 정제된 태그 ({len(cleaned_tags)}개): {cleaned_tags}")
             else:
                 print("⚠️ 태그가 추출되지 않았습니다.")
                 
