@@ -1,9 +1,11 @@
 import time
 import uuid
 import hashlib
+import logging 
 from typing import Dict, Any, List, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, File, UploadFile
+from fastapi.responses import JSONResponse
 
 from .models import (
     ExtractIn, ExtractOut, ExtractOutItem,
@@ -15,9 +17,21 @@ from .models import (
 from .services.extract_keywords import extract_keywords_text
 from .services.extract_tags import get_tags_with_ollama, controlled_vocab
 from .services.extract_category import classifier
+from .services.tag_cleaner import clean_tags_entry
+from .services.article_recom import ArticleService
 from .services import mongo_simple
 
 router = APIRouter()
+
+
+# ---- Configuration for Elasticsearch ----
+ES_HOST = "http://192.168.0.123:9200"
+ES_AUTH = ("elastic", "elastic")
+INDEX_NAME = "article_recommender"
+
+# Initialize ArticleService
+article_service = ArticleService(ES_HOST, ES_AUTH, INDEX_NAME)
+
 
 # ---- in-memory stores (demo) ----
 _JOBS: Dict[str, Dict[str, Any]] = {}
@@ -91,6 +105,8 @@ def extract(body: ExtractIn, idempotency_key: Optional[str] = Header(default=Non
                 model_name=model_for_tags,
                 server_name="remote"  # 원격 서버 사용
             )
+            # 태깅 전처리 과정 추가 
+            tags = clean_tags_entry(tags)
             # 모델 검증층에서 'cat/Keyword' 패턴 정규화/검증 수행됨
 
         # 3) 카테고리(단일)
@@ -378,3 +394,129 @@ def get_processing_status():
         "collection": settings.MONGODB_COLLECTION,
         "database": settings.MONGODB_DB
     }
+
+
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# ---- 추천 엔드포인트 ----
+
+@router.post("/recommendations/index", response_model=dict)
+async def index_articles(file: UploadFile = File(...)):
+    """기사들을 Elasticsearch에 인덱싱하여 추천 시스템에 활용하는 엔드포인트"""
+    
+    # 파일 확장자 검증 - .jsonl 파일만 허용
+    if not file.filename.endswith('.jsonl'):
+        raise HTTPException(status_code=400, detail="파일은 .jsonl 형식이어야 합니다")
+    
+    try:
+        # 업로드된 파일을 임시로 저장
+        content = await file.read()
+        temp_file_path = f"/tmp/{file.filename}"
+        with open(temp_file_path, 'wb') as f:
+            f.write(content)
+        
+        # 기사 데이터 로드 및 인덱싱
+        articles = article_service.load_jsonl_data(temp_file_path)
+        if not articles:
+            raise HTTPException(status_code=400, detail="파일에서 유효한 기사를 찾을 수 없습니다")
+        
+        # 기사들을 Elasticsearch에 인덱싱
+        total_indexed = article_service.index_articles(articles)
+        return {"message": f"총 {total_indexed}개의 기사가 성공적으로 인덱싱되었습니다"}
+        
+    except Exception as e:
+        logger.error(f"기사 인덱싱 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"기사 인덱싱 실패: {str(e)}")
+
+
+@router.get("/recommendations/search", response_model=List[Dict])
+async def search_recommendations(
+    query: str, 
+    top_k: int = Query(default=5, ge=1, le=20),
+    group: Optional[str] = Query(default=None)
+):
+    """쿼리를 기반으로 기사 추천을 검색하는 엔드포인트"""
+    
+    try:
+        # 그룹 필터 설정 (선택사항)
+        filters = {"match": {"group": group}} if group else None
+        
+        # 추천 검색 실행
+        recommendations = article_service.search_recommendations(query, top_k, filters)
+        return recommendations
+        
+    except Exception as e:
+        logger.error(f"추천 검색 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"추천 검색 실패: {str(e)}")
+
+
+@router.post("/rss/recommendations/process-all")
+def process_all_rss_for_recommendations(
+    batch_size: int = Query(default=50, ge=1, le=500),
+    skip_existing: bool = Query(default=True)
+):
+    """모든 RSS 항목을 추천 인덱싱을 위해 처리하는 엔드포인트"""
+    
+    from .core.config import settings
+    
+    # 고유한 작업 ID 생성
+    job_id = str(uuid.uuid4())
+    
+    # 작업 상태 초기화
+    _JOBS[job_id] = {
+        "status": "대기중",          # 작업 상태
+        "progress": 0,              # 진행률 (%)
+        "created_at": int(time.time()),  # 생성 시간
+        "mode": "connector",        # 작업 모드
+        "error": None,             # 오류 메시지
+        "total": 0,                # 총 처리할 문서 수
+        "done": 0,                 # 완료된 문서 수
+    }
+    
+    try:
+        # MongoDB에서 RSS 문서들을 스트리밍으로 가져오기
+        # skip_existing이 True면 이미 처리된 문서는 제외
+        docs = list(mongo_simple.stream_docs(
+            uri=settings.MONGODB_URI,
+            db=settings.MONGODB_DB,
+            collection=settings.MONGODB_COLLECTION,
+            flt={"processed": {"$ne": True}} if skip_existing else {},  # 필터 조건
+            batch_size=batch_size
+        ))
+        
+        # 총 문서 수 업데이트
+        _JOBS[job_id]["total"] = len(docs)
+        
+        # MongoDB 문서를 추천 시스템용 기사 형태로 변환
+        articles = []
+        for d in docs:
+            articles.append({
+                "guid": str(d.get("_id")),  # 고유 식별자
+                "title": d.get("title") or d.get("headline") or "",  # 제목
+                "description": (d.get("description") or d.get("abstract") or 
+                              d.get("content") or d.get("article") or ""),  # 내용
+                "keywords": d.get("keywords", [])  # 키워드 목록
+            })
+        
+        # 기사들을 Elasticsearch에 인덱싱
+        total_indexed = article_service.index_articles(articles)
+        
+        # 작업 완료 상태 업데이트
+        _JOBS[job_id].update(status="성공", progress=100, done=total_indexed)
+        
+        return {
+            "job_id": job_id, 
+            "status": "성공", 
+            "total_indexed": total_indexed
+        }
+        
+    except Exception as e:
+        # 오류 발생 시 작업 상태 업데이트
+        _JOBS[job_id].update(status="실패", error=str(e))
+        raise HTTPException(
+            status_code=500, 
+            detail=f"RSS 항목 추천 처리 실패: {str(e)}"
+        )
