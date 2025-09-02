@@ -1,3 +1,7 @@
+from __future__ import annotations
+from dotenv import load_dotenv ; load_dotenv()
+
+import os
 import time
 import uuid
 import hashlib
@@ -13,6 +17,10 @@ from .models import (
     JobIn, JobStatus,
     OptKeywords, OptTags, OptCategories, ExtractOptions,
 )
+
+# 설정
+from .core.config import settings
+
 # 서비스
 from .services.extract_keywords import extract_keywords_text
 from .services.extract_tags import get_tags_with_ollama, controlled_vocab
@@ -25,9 +33,9 @@ router = APIRouter()
 
 
 # ---- Configuration for Elasticsearch ----
-ES_HOST = "http://192.168.0.123:9200"
-ES_AUTH = ("elastic", "elastic")
-INDEX_NAME = "article_recommender"
+ES_HOST = settings.ES_HOST
+ES_AUTH = settings.ES_AUTH
+INDEX_NAME = settings.ES_INDEX_NAME
 
 # Initialize ArticleService
 article_service = ArticleService(ES_HOST, ES_AUTH, INDEX_NAME)
@@ -288,9 +296,9 @@ def test_rss_connection():
     """RSS MongoDB 연결 테스트"""
     from .core.config import settings
     return mongo_simple.ping(
-        uri=settings.MONGODB_URI,
-        db=settings.MONGODB_DB,
-        collection=settings.MONGODB_COLLECTION
+        uri=settings.MONGO_SERVERS['local']['base_url'],
+        db=settings.MONGO_DB,
+        collection=settings.MONGO_COLLECTION
     )
 
 # ---- RSS 전체 배치 처리 ----
@@ -308,9 +316,9 @@ def process_all_rss_entries(
         "mode": "connector",
         "connector": {
             "type": "mongo",
-            "uri": settings.MONGODB_URI,
-            "db": settings.MONGODB_DB,
-            "collection": settings.MONGODB_COLLECTION,
+            "uri": settings.MONGO_SERVERS['local']['base_url'],
+            "db": settings.MONGO_DB,
+            "collection": settings.MONGO_COLLECTION,
             "filter": {"processed": {"$ne": True}} if skip_existing else {},
             "batch_size": batch_size,
             "update_mode": "upsert" if not test_mode else "none"
@@ -391,8 +399,8 @@ def get_processing_status():
         "processed_entries": processed_count,
         "remaining_entries": total_count - processed_count,
         "progress_percentage": round(progress_percentage, 2),
-        "collection": settings.MONGODB_COLLECTION,
-        "database": settings.MONGODB_DB
+        "collection": settings.MONGO_COLLECTION,
+        "database": settings.MONGO_DB
     }
 
 
@@ -480,9 +488,9 @@ def process_all_rss_for_recommendations(
         # MongoDB에서 RSS 문서들을 스트리밍으로 가져오기
         # skip_existing이 True면 이미 처리된 문서는 제외
         docs = list(mongo_simple.stream_docs(
-            uri=settings.MONGODB_URI,
-            db=settings.MONGODB_DB,
-            collection=settings.MONGODB_COLLECTION,
+            uri=settings.MONGO_SERVERS['local']['base_url'],
+            db=settings.MONGO_DB,
+            collection=settings.MONGO_COLLECTION,
             flt={"processed": {"$ne": True}} if skip_existing else {},  # 필터 조건
             batch_size=batch_size
         ))

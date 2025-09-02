@@ -15,7 +15,7 @@ class MongoService:
     """MongoDB 서비스"""
     
     def __init__(self, connection_string: Optional[str] = None):
-        self.connection_string = connection_string or settings.MONGODB_URI
+        self.connection_string = connection_string or settings.MONGO_SERVERS['local']['base_url']
         self.client = None
         self._connect()
     
@@ -40,7 +40,7 @@ class MongoService:
         if not self.client:
             self._connect()
         
-        db_name = db_name or settings.MONGODB_DB
+        db_name = db_name or settings.MONGO_DB
         return self.client[db_name] if self.client else None
     
     def get_documents(self, collection_name: str, limit: int = 10, db_name: str = None) -> List[Dict[str, Any]]:
@@ -134,7 +134,7 @@ class MongoService:
         if db is None:
             return []
         
-        collection = db[settings.MONGODB_COLLECTION]
+        collection = db[settings.MONGO_COLLECTION]
         
         # 필터에서 _id 처리
         if filter_dict and '_id' in filter_dict:
@@ -162,7 +162,7 @@ class MongoService:
         if db is None:
             return 0
         
-        collection = db[settings.MONGODB_COLLECTION]
+        collection = db[settings.MONGO_COLLECTION]
         return collection.count_documents(filter_dict or {})
 
 

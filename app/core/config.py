@@ -1,10 +1,13 @@
+from dotenv import load_dotenv ; load_dotenv()
+import os
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    
+
+    # 1. APP 설정
     APP_NAME: str = "Redfin Recommendation API"
     APP_VERSION: str = "0.1.0"
     APP_DESCRIPTION: str = "API for recommendation"
@@ -13,20 +16,45 @@ class Settings(BaseSettings):
     APP_DEBUG: bool = True
     APP_API_V1_STR: str = "/api/v1"
     APP_LOG_LEVEL: str = "INFO"
-    # Ollama 설정 (기존 설정 유지)
-    OLLAMA_MODEL: str = "ollama:gemma3:4b"
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
+
+    # 2. TODO: 카테고리 스키마 설정
+    CATALOG_SCHEME: str = "redfin-minds-2025"
+    CATALOG_CATEGORIES: List[str] = []
+    CATALOG_TAGS: List[str] = []
+
+    # 3. MongoDB 설정
+    MONGO_DB: str = "redfin"
+    MONGO_COLLECTION: str = "rss_all_entries"
     
+    MONGO_BASE_URI: str = os.getenv("MONGO_BASE_URI", "mongodb://admin:Redfin7620!@localhost:27017")
+    MONGO_SERVERS: dict = {
+        "local": {
+            "base_url": os.getenv("MONGO_SERVERS_LOCAL_BASE_URL", "mongodb://admin:Redfin7620!@localhost:27017"),
+        },
+        "remote": {
+            "base_url": os.getenv("MONGO_SERVERS_REMOTE_BASE_URL", "mongodb://100.97.183.123:27017"),
+        }
+    }
+
+    # 4. Elasticsearch 설정
+    ES_HOST: str = os.getenv("ES_HOST", "http://localhost:9200")
+    ES_AUTH: tuple = (os.getenv("ES_USER", "elastic"), os.getenv("ES_PASSWORD", "elastic"))
+    ES_INDEX_NAME: str = os.getenv("ES_INDEX_NAME", "article_recommender")
+
+    # 5. Ollama 설정
+    OLLAMA_MODEL: str = "ollama:gemma3:4b"
+    OLLAMA_BASE_URI: str = os.getenv("OLLAMA_BASE_URI", "http://localhost:11434")
+
     # 다중 Ollama 서버 및 모델 설정
     OLLAMA_SERVERS: dict = {
         "local": {
-            "base_url": "http://localhost:11434",
+            "base_url": os.getenv("OLLAMA_SERVERS_LOCAL_BASE_URL", "http://localhost:11434"),
             "models": {
                 "gemma3:4b": "ollama:gemma3:4b"
             }
         },
         "remote": {
-            "base_url": "http://100.97.183.123:11434",
+            "base_url": os.getenv("OLLAMA_SERVERS_REMOTE_BASE_URL", "http://100.97.183.123:11434"),
             "models": {
                 "qwen2.5:3b-instruct-q4_K_M": "qwen2.5:3b-instruct-q4_K_M",
                 "llama3.2:3b-instruct-q5_K_M": "llama3.2:3b-instruct-q5_K_M", 
@@ -36,23 +64,10 @@ class Settings(BaseSettings):
             }
         }
     }
-    
+
     # 기본 서버 및 모델 선택
     DEFAULT_OLLAMA_SERVER: str = "remote"
     DEFAULT_OLLAMA_MODEL: str = "qwen2.5:3b-instruct-q4_K_M"
-    
-    CATALOG_SCHEME: str = "redfin-minds-2025"
-    
-    # MongoDB 설정
-    MONGODB_URI: str = "mongodb://100.97.183.123:27017"
-    MONGODB_DB: str = "redfin"
-    MONGODB_COLLECTION: str = "rss_all_entries"
-    # TODO: 카테고리 스키마 목록/내용
-    CATALOG_CATEGORIES: List[str] = [
-        
-    ]
-    CATALOG_TAGS: List[str] = [
 
-    ]
 
 settings = Settings()
