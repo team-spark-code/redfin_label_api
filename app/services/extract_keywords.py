@@ -22,6 +22,7 @@ def extract_keywords_yake(input_file, output_file, top_k: int = 10):
             except json.JSONDecodeError as e:
                 print(f"Error parsing JSON line: {e}")
             except Exception as e:
+                
                 print(f"Error processing line: {e}")
 
     print(f"Keywords extracted and saved to {output_file}")
@@ -31,7 +32,7 @@ def extract_keywords_from_text(title: str, content: str, top_k: int = 10):
     """
     단일 문자열에서 키워드 추출 (simple_processor 호환용)
     """
-    text = (text or "").strip()
+    text = (title + " " + content).strip()
     if not text:
         return []
     try:
