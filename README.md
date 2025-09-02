@@ -25,7 +25,7 @@ RedFin Label API는 AI 산업 뉴스의 키워드 추출, 태그 생성, 카테�
 
 ```bash
 # 저장소 클론
-git clone <repository-url>
+git clone https://github.com/team-spark-code/redfin_label_api.git
 cd redfin_label_api
 
 # 전체 스택 실행 (API + Ollama + MongoDB)
