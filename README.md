@@ -221,7 +221,7 @@ pytest tests/ -v
 ### 9.2 테스트
 ```bash
 # 단위 테스트
-pytest
+PYTHONPATH=./ pytest tests/test_api.py
 
 # API 테스트
 python test_ollama_models.py
