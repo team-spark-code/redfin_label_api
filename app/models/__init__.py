@@ -15,6 +15,7 @@ class TextIn(BaseModel):
     단일 문서 입력. JSONL의 'description'을 'content'로 자동 승격
     """
     model_config = ConfigDict(extra="allow") # 필요 시 부가 필드 통과
+    
     id: str
     title: Optional[str] = None
     content: str
@@ -44,6 +45,7 @@ class TextIn(BaseModel):
             obj = cls._coerce_content(obj)
         return super().model_validate(obj, strict=strict, from_attributes=from_attributes, context=context)
 
+
 # ------------------------------------------------------------
 # Options (Algorithm/Model Selection)
 # ------------------------------------------------------------
@@ -67,6 +69,7 @@ class ExtractOptions(BaseModel):
     keywords: OptKeywords = OptKeywords()
     tags: OptTags = OptTags()
     categories: OptCategories = OptCategories()
+
 
 # ------------------------------------------------------------
 # /extract 요청/응답
