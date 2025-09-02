@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     MONGO_COLLECTION: str = "rss_all_entries"
     
     MONGO_BASE_URI: str = os.getenv("MONGO_BASE_URI", "mongodb://admin:Redfin7620!@localhost:27017")
+    MONGO_LOCAL_URI: str = os.getenv("MONGO_LOCAL_URI", "mongodb://admin:Redfin7620!@localhost:27017")
+    MONGO_REMOTE_URI: str = os.getenv("MONGO_REMOTE_URI", "mongodb://100.97.183.123:27017")
     MONGO_SERVERS: dict = {
         "local": {
             "base_url": os.getenv("MONGO_SERVERS_LOCAL_BASE_URL", "mongodb://admin:Redfin7620!@localhost:27017"),
@@ -40,10 +42,14 @@ class Settings(BaseSettings):
     ES_HOST: str = os.getenv("ES_HOST", "http://localhost:9200")
     ES_AUTH: tuple = (os.getenv("ES_USER", "elastic"), os.getenv("ES_PASSWORD", "elastic"))
     ES_INDEX_NAME: str = os.getenv("ES_INDEX_NAME", "article_recommender")
+    ES_USER: str = os.getenv("ES_USER", "elastic")
+    ES_PASSWORD: str = os.getenv("ES_PASSWORD", "elastic")
+    INDEX_NAME: str = os.getenv("INDEX_NAME", "article_recommender")
 
     # 5. Ollama 설정
     OLLAMA_MODEL: str = "ollama:gemma3:4b"
     OLLAMA_BASE_URI: str = os.getenv("OLLAMA_BASE_URI", "http://localhost:11434")
+    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     # 다중 Ollama 서버 및 모델 설정
     OLLAMA_SERVERS: dict = {
@@ -64,10 +70,13 @@ class Settings(BaseSettings):
             }
         }
     }
+    OLLAMA_SERVERS_LOCAL_BASE_URL: str = os.getenv("OLLAMA_SERVERS_LOCAL_BASE_URL", "http://localhost:11434")
+    OLLAMA_SERVERS_REMOTE_BASE_URL: str = os.getenv("OLLAMA_SERVERS_REMOTE_BASE_URL", "http://100.97.183.123:11434")
 
     # 기본 서버 및 모델 선택
     DEFAULT_OLLAMA_SERVER: str = "remote"
     DEFAULT_OLLAMA_MODEL: str = "qwen2.5:3b-instruct-q4_K_M"
+
 
 
 settings = Settings()

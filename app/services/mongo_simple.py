@@ -30,9 +30,9 @@ class MongoService:
             )
             # 연결 테스트
             self.client.admin.command('ping')
-            logger.info(f"MongoDB 연결 성공: {self.connection_string}")
+            logger.info(f"Connected to MongoDB: {self.connection_string}")
         except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-            logger.error(f"MongoDB 연결 실패: {e}")
+            logger.error(f"Failed to connect to MongoDB: {e}")
             self.client = None
     
     def get_database(self, db_name: str = None):
