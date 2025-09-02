@@ -22,12 +22,50 @@ from .models import (
 from .core.config import settings
 
 # 서비스
-from .services.extract_keywords import extract_keywords_text
+from .services.extract_keywords import extract_keywords_from_text
 from .services.extract_tags import get_tags_with_ollama, controlled_vocab
 from .services.extract_category import classifier
 from .services.tag_cleaner import clean_tags_entry
 from .services.article_recom import ArticleService
 from .services import mongo_simple
+from .services.mongo_simple import MongoService
+
+# 라우터
+from .routers.extract import router as extract_router
+from .routers.rss import router as rss_router
+from .routers.rec import router as rec_router
+
+# 로직
+from sentence_transformers import SentenceTransformer
+from elasticsearch import Elasticsearch, helpers
+
+
+# Elasticsearch 및 SentenceTransformer 초기화
+es = Elasticsearch("http://localhost:9200", basic_auth=("elastic", "elastic"), verify_certs=False)
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+# 임베딩 생성 함수
+
+def generate_embedding(text: str) -> List[float]:
+    try:
+        return model.encode(text).tolist()
+    except Exception as e:
+        logger.error(f"Failed to generate embedding: {e}")
+        return []
+
+# Elasticsearch에 문서 인덱싱
+
+def index_document(doc_id: str, title: str, content: str, keywords: List[str]):
+    embedding = generate_embedding(f"{title}. {content}. {', '.join(keywords)}")
+    if not embedding:
+        return
+    doc = {
+        "title": title,
+        "content": content,
+        "keywords": keywords,
+        "embedding": embedding
+    }
+    es.index(index="documents", id=doc_id, document=doc)
 
 router = APIRouter()
 
@@ -70,26 +108,30 @@ def _to_category_items(cat: str, conf: float) -> List[CategoryItem]:
 
 # ---- health & catalog ----
 @router.get("/health")
-def health():
+def get_health_status():
     return {"status": "ok", "ts": int(time.time())}
 
 @router.get("/catalog/categories")
-def catalog_categories():
+def get_catalog_categories():
     # ArticleClassifier가 가진 카테고리 반환
     return {"scheme": "redfin-minds-2025", "labels": classifier.get_available_categories()}
 
 @router.get("/catalog/tags")
-def catalog_tags():
+def get_catalog_tags():
     # controlled_vocab 카테고리별 후보를 납품
     return {"tags_catalog": controlled_vocab}
 
-# ---- /extract ----
+# /extract API에 태그 및 카테고리 정리 로직 추가
 @router.post("/extract", response_model=ExtractOut)
-def extract(body: ExtractIn, idempotency_key: Optional[str] = Header(default=None)):
+def extract_data(body: ExtractIn, idempotency_key: Optional[str] = Header(default=None)):
+    # 캐시 키 새성
     cache_key = idempotency_key or _hash_extract_request(body)
+    
+    # 캐시 체크 & 캐시 히트
     if cache_key in _EXTRACT_CACHE:
         return _EXTRACT_CACHE[cache_key]
 
+    # 옵션 추출
     opts = body.options
     model_for_tags = _strip_ollama_prefix(opts.tags.model)
 
@@ -98,11 +140,15 @@ def extract(body: ExtractIn, idempotency_key: Optional[str] = Header(default=Non
         title = doc.title or ""
         content = doc.content or ""
 
-        # 1) 키워드
-        keywords = extract_keywords_text(title, content, top_k=opts.keywords.top_k) if opts.keywords.enable else []
+        # 1. 키워드
+
+        # 1-1. 키워드 추출
+        keywords = extract_keywords_from_text(title, content, top_k=opts.keywords.top_k) if opts.keywords.enable else []
+        
+        # 1-2. 키워드 형식 변환
         kw_items = _to_keyword_items(keywords)
 
-        # 2) 태그('cat/Keyword')
+        # 2. 태그('cat/Keyword')
         tags: List[str] = []
         if opts.tags.enable:
             tags = get_tags_with_ollama(
@@ -117,7 +163,7 @@ def extract(body: ExtractIn, idempotency_key: Optional[str] = Header(default=Non
             tags = clean_tags_entry(tags)
             # 모델 검증층에서 'cat/Keyword' 패턴 정규화/검증 수행됨
 
-        # 3) 카테고리(단일)
+        # 3. 카테고리(단일)
         cat_items: List[CategoryItem] = []
         if opts.categories.enable:
             res = classifier.classify_article(title=title, description=content, keywords=", ".join(keywords))
@@ -132,6 +178,8 @@ def extract(body: ExtractIn, idempotency_key: Optional[str] = Header(default=Non
                 categories=cat_items,
             )
         )
+        # 문서 인덱싱
+        index_document(doc.id, title, content, keywords)
 
     out = ExtractOut(results=results, meta={
         "algo": opts.keywords.algo,
@@ -171,7 +219,7 @@ def create_job(body: JobIn):
             if not conn or conn.type != "mongo":
                 raise HTTPException(400, "unsupported or missing connector")
 
-            docs = list(mongo_simple.stream_docs(
+            docs = list(mongo.stream_docs(
                 uri=conn.uri, db=conn.db, collection=conn.collection,
                 flt=conn.filter, proj=conn.projection, batch_size=conn.batch_size
             ))
@@ -206,7 +254,7 @@ def create_job(body: JobIn):
     return {"job_id": job_id, "status": _JOBS[job_id]["status"]}
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
-def job_status(job_id: str):
+def get_job_status(job_id: str):
     j = _JOBS.get(job_id)
     if not j:
         raise HTTPException(404, "job not found")
@@ -221,7 +269,7 @@ def job_status(job_id: str):
     }
 
 @router.get("/jobs/{job_id}/results")
-def job_results(job_id: str, page: int = Query(1, ge=1), size: int = Query(100, ge=1, le=1000)):
+def get_job_results(job_id: str, page: int = Query(1, ge=1), size: int = Query(100, ge=1, le=1000)):
     items = _RESULTS.get(job_id)
     if items is None:
         raise HTTPException(404, "no results for job")
@@ -230,7 +278,7 @@ def job_results(job_id: str, page: int = Query(1, ge=1), size: int = Query(100, 
     return {"job_id": job_id, "page": page, "size": size, "total": len(items), "items": items[start:end]}
 
 @router.post("/jobs/{job_id}/cancel")
-def job_cancel(job_id: str):
+def cancel_job(job_id: str):
     j = _JOBS.get(job_id)
     if not j:
         raise HTTPException(404, "job not found")
@@ -238,9 +286,9 @@ def job_cancel(job_id: str):
     return {"job_id": job_id, "status": "canceled"}
 
 # ---- connector sanity ----
-@router.get("/connectors/mongo/test")
-def mongo_test(uri: str, db: str, collection: str):
-    return mongo_simple.ping(uri, db, collection)
+@router.get("/connectors/mongo/test-connection")
+def test_mongo_connection(uri: str, db: str, collection: str):
+    return mongo.ping(uri, db, collection)
 
 # ---- RSS 데이터 관련 엔드포인트 ----
 @router.get("/rss/entries")
@@ -254,8 +302,8 @@ def get_rss_entries(
     if title_contains:
         filter_dict["title"] = {"$regex": title_contains, "$options": "i"}
     
-    entries = mongo_simple.get_rss_entries(limit=limit, skip=skip, filter_dict=filter_dict)
-    total_count = mongo_simple.count_rss_entries(filter_dict=filter_dict)
+    entries = mongo.get_rss_entries(limit=limit, skip=skip, filter_dict=filter_dict)
+    total_count = mongo.count_rss_entries(filter_dict=filter_dict)
     
     return {
         "entries": entries,
@@ -270,7 +318,7 @@ def get_rss_entries(
 @router.get("/rss/entries/count")
 def get_rss_entries_count():
     """RSS 엔트리 총 개수 조회"""
-    count = mongo_simple.count_rss_entries()
+    count = mongo.count_rss_entries()
     return {"total_count": count}
 
 @router.get("/rss/entries/{entry_id}")
@@ -285,24 +333,24 @@ def get_rss_entry(entry_id: str):
         # ObjectId가 아니면 문자열로 검색
         filter_dict = {"_id": entry_id}
     
-    entries = mongo_simple.get_rss_entries(limit=1, filter_dict=filter_dict)
+    entries = mongo.get_rss_entries(limit=1, filter_dict=filter_dict)
     if not entries:
         raise HTTPException(404, "RSS entry not found")
     
     return {"entry": entries[0]}
 
-@router.get("/rss/test-connection")
+@router.get("/rss/connection/test")
 def test_rss_connection():
     """RSS MongoDB 연결 테스트"""
     from .core.config import settings
-    return mongo_simple.ping(
+    return mongo.ping(
         uri=settings.MONGO_SERVERS['local']['base_url'],
         db=settings.MONGO_DB,
         collection=settings.MONGO_COLLECTION
     )
 
 # ---- RSS 전체 배치 처리 ----
-@router.post("/rss/process-all")
+@router.post("/rss/entries/process-all")
 def process_all_rss_entries(
     batch_size: int = Query(default=50, ge=1, le=500),
     skip_existing: bool = Query(default=True),
@@ -336,14 +384,14 @@ def process_all_rss_entries(
     # 기존 create_job 함수 재사용
     return create_job(job_in)
 
-@router.post("/rss/process-sample")
+@router.post("/rss/entries/process-sample")
 def process_sample_rss_entries(
     limit: int = Query(default=10, ge=1, le=100),
     skip: int = Query(default=0, ge=0)
 ):
     """RSS 엔트리 샘플에 대해 키워드, 태그, 카테고리 처리 (테스트용)"""
     # RSS 엔트리 가져오기
-    entries = mongo_simple.get_rss_entries(limit=limit, skip=skip)
+    entries = mongo.get_rss_entries(limit=limit, skip=skip)
     
     if not entries:
         return {"message": "처리할 엔트리가 없습니다.", "count": 0}
@@ -371,7 +419,7 @@ def process_sample_rss_entries(
     )
     
     # 처리 실행
-    result = extract(extract_request)
+    result = extract_data(extract_request)
     
     return {
         "message": f"{len(entries)}개 엔트리 처리 완료",
@@ -380,16 +428,16 @@ def process_sample_rss_entries(
         "meta": result.meta
     }
 
-@router.get("/rss/processing-status")
+@router.get("/rss/entries/processing-status")
 def get_processing_status():
     """RSS 컬렉션의 처리 상태 조회"""
     from .core.config import settings
     
     # 전체 문서 수
-    total_count = mongo_simple.count_rss_entries()
+    total_count = mongo.count_rss_entries()
     
     # 처리된 문서 수 (processed: true 필드가 있는 것들)
-    processed_count = mongo_simple.count_rss_entries({"processed": True})
+    processed_count = mongo.count_rss_entries({"processed": True})
     
     # 진행률 계산
     progress_percentage = (processed_count / total_count * 100) if total_count > 0 else 0
@@ -411,7 +459,7 @@ logger = logging.getLogger(__name__)
 
 # ---- 추천 엔드포인트 ----
 
-@router.post("/recommendations/index", response_model=dict)
+@router.post("/rec/index", response_model=dict)
 async def index_articles(file: UploadFile = File(...)):
     """기사들을 Elasticsearch에 인덱싱하여 추천 시스템에 활용하는 엔드포인트"""
     
@@ -422,12 +470,12 @@ async def index_articles(file: UploadFile = File(...)):
     try:
         # 업로드된 파일을 임시로 저장
         content = await file.read()
-        temp_file_path = f"/tmp/{file.filename}"
-        with open(temp_file_path, 'wb') as f:
+        data_file_path = "data/output/articles_with_keywords.jsonl"
+        with open(data_file_path, 'wb') as f:
             f.write(content)
         
         # 기사 데이터 로드 및 인덱싱
-        articles = article_service.load_jsonl_data(temp_file_path)
+        articles = article_service.load_jsonl_data(data_file_path)
         if not articles:
             raise HTTPException(status_code=400, detail="파일에서 유효한 기사를 찾을 수 없습니다")
         
@@ -440,7 +488,7 @@ async def index_articles(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"기사 인덱싱 실패: {str(e)}")
 
 
-@router.get("/recommendations/search", response_model=List[Dict])
+@router.get("/rec/search", response_model=List[Dict])
 async def search_recommendations(
     query: str, 
     top_k: int = Query(default=5, ge=1, le=20),
@@ -461,7 +509,7 @@ async def search_recommendations(
         raise HTTPException(status_code=500, detail=f"추천 검색 실패: {str(e)}")
 
 
-@router.post("/rss/recommendations/process-all")
+@router.post("/rss/entries/process-all")
 def process_all_rss_for_recommendations(
     batch_size: int = Query(default=50, ge=1, le=500),
     skip_existing: bool = Query(default=True)
@@ -487,7 +535,7 @@ def process_all_rss_for_recommendations(
     try:
         # MongoDB에서 RSS 문서들을 스트리밍으로 가져오기
         # skip_existing이 True면 이미 처리된 문서는 제외
-        docs = list(mongo_simple.stream_docs(
+        docs = list(mongo.stream_docs(
             uri=settings.MONGO_SERVERS['local']['base_url'],
             db=settings.MONGO_DB,
             collection=settings.MONGO_COLLECTION,

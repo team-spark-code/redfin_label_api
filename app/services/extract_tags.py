@@ -106,3 +106,29 @@ def get_tags_with_ollama_legacy(title, content, yake_keywords, vocab, model_name
     """기존 호환성을 위한 래퍼 함수"""
     return get_tags_with_ollama(title, content, yake_keywords, vocab, model_name)
 
+
+# simple_processor 호환용
+def extract_tags_from_text(text: str, top_k: int = 8, model_name: str = None, server_name: str = None):
+    """
+    단일 문자열 입력으로 YAKE 키워드를 내부에서 뽑아 Ollama 태깅을 수행하는 헬퍼
+    (simple_processor 호환용)
+    """
+    text = (text or "").strip()
+    # YAKE로 보조 키워드 생성
+    try:
+        import yake
+        kw_extractor = yake.KeywordExtractor(top=top_k, stopwords=None)
+        yake_keywords = [kw for kw, _ in kw_extractor.extract_keywords(text)]
+    except Exception:
+        yake_keywords = []
+
+    # 제목은 비워두고 content에만 본문을 둠
+    tags = get_tags_with_ollama(
+        title="",
+        context=text,
+        yake_keywords=yake_keywords,
+        vocab=controlled_vocab,
+        model_name=model_name,
+        server_name=server_name
+    )
+    return tags

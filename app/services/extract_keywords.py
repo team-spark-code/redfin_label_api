@@ -27,12 +27,14 @@ def extract_keywords_yake(input_file, output_file, top_k: int = 10):
     print(f"Keywords extracted and saved to {output_file}")
 
 
-def extract_keywords_text(title: str, content: str, top_k: int = 10):
-    text = f"{(title or '').strip()} {(content or '').strip()}".strip()
+def extract_keywords_from_text(title: str, content: str, top_k: int = 10):
+    """
+    단일 문자열에서 키워드 추출 (simple_processor 호환용)
+    """
+    text = (text or "").strip()
     if not text:
         return []
     try:
-        import yake
         kw_extractor = yake.KeywordExtractor(top=top_k, stopwords=None)
         return [kw for kw, _ in kw_extractor.extract_keywords(text)]
     except Exception:
