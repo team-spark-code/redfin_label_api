@@ -39,7 +39,7 @@ curl http://localhost:8010/api/v1/health
 
 ```bash
 # 저장소 클론
-git clone <repository-url>
+git clone https://github.com/team-spark-code/redfin_label_api.git
 cd redfin_label_api
 
 # 가상환경 설정
