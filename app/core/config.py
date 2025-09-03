@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     APP_API_V1_STR: str = "/api/v1"
     APP_LOG_LEVEL: str = "INFO"
 
-    # 2. TODO: 카테고리 스키마 설정
+    # 2. 카테고리 스키마 설정
     CATALOG_SCHEME: str = "redfin-minds-2025"
     CATALOG_CATEGORIES: List[str] = []
     CATALOG_TAGS: List[str] = []
@@ -76,7 +76,5 @@ class Settings(BaseSettings):
     # 기본 서버 및 모델 선택
     DEFAULT_OLLAMA_SERVER: str = "remote"
     DEFAULT_OLLAMA_MODEL: str = "qwen2.5:3b-instruct-q4_K_M"
-
-
 
 settings = Settings()
