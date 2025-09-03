@@ -1,28 +1,27 @@
 from __future__ import annotations
-from dotenv import load_dotenv ; load_dotenv()
+from dotenv import load_dotenv; load_dotenv()
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from pydantic import BaseModel, Field
 
-from ..models import TextIn, ExtractOut
 from ..services.mongo_simple import MongoService
-
-# 인스턴스 생성
-mongo = MongoService()
-
 from ..services.article_recom import ArticleService
 
-# 인스턴스 생성
-article_service = ArticleService(es_host='http://localhost:9200', es_auth=('elastic', 'elastic'), index_name='articles')
+# Services
+mongo = MongoService()
+article_service = ArticleService(
+    es_host="http://192.168.0.123:9200",
+    es_auth=("elastic", "elastic"),
+    index_name="article_recommender"
+)
 
 router = APIRouter(prefix="/v1/rec", tags=["recommend"])
 
-
 # ---------- Schemas ----------
 class IndexRequest(BaseModel):
-    source_domain: Optional[str] = Field(None, description="해당 도메인만 인덱싱")
     reindex: bool = Field(False, description="기존 인덱스 재생성 여부")
+    file_path: Optional[str] = Field(None, description="JSON/JSONL 파일 경로")
     limit: int = Field(5000, ge=1, le=50000)
 
 class SearchResponse(BaseModel):
@@ -32,37 +31,31 @@ class SearchResponse(BaseModel):
 
 # ---------- Endpoints ----------
 @router.post("/index")
-def build_index(req: IndexRequest = Body(...), db = Depends(mongo.get_database)):
-    es = article_service.es
+def build_index(req: IndexRequest = Body(...)):
     try:
-        article_service.ensure_index(es, recreate=req.reindex)  # 없으면 만들고, 재색인 옵션 있으면 다시 만듦
-        q: Dict[str, Any] = {}
-        if req.source_domain:
-            q["source"] = req.source_domain
-        count = article_service.index_from_mongo(es=es, db=db, query=q, limit=req.limit)
-        return {"indexed": count, "reindex": req.reindex, "filter": q}
+        if req.reindex:
+            article_service.create_index()
+
+        if not req.file_path:
+            raise HTTPException(status_code=400, detail="file_path is required")
+
+        articles = article_service.load_jsonl_data(req.file_path)
+        if req.limit:
+            articles = articles[:req.limit]
+
+        count = article_service.index_articles(articles)
+        return {"indexed": count, "reindex": req.reindex}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"index error: {e!s}")
 
-
-@router.post("/index")
-def build_index(req: IndexRequest = Body(...), db = Depends(mongo.get_database)):
-    es = article_service.es
-    try:
-        article_service.ensure_index(es, recreate=req.reindex)  # 없으면 만들고, 재색인 옵션 있으면 다시 만듦
-        q: Dict[str, Any] = {}
-        if req.source_domain:
-            q["source"] = req.source_domain
-        count = article_service.index_from_mongo(es=es, db=db, query=q, limit=req.limit)
-        return {"indexed": count, "reindex": req.reindex, "filter": q}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"index error: {e!s}")
 
 @router.get("/search")
-def rec_search(q: str = Query(..., min_length=1, description="검색어"), size: int = Query(10, ge=1, le=100), offset: int = Query(0, ge=0)):
-    es = article_service.es
+def rec_search(
+    q: str = Query(..., min_length=1, description="검색어"),
+    size: int = Query(10, ge=1, le=100)
+):
     try:
-        result = article_service.search_articles(es=es, query=q, size=size, offset=offset)
-        return SearchResponse(total=result["total"], items=result["items"])
+        results = article_service.search_recommendations(query=q, top_k=size)
+        return SearchResponse(total=len(results), items=results)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"search error: {e!s}")

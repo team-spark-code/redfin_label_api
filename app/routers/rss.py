@@ -18,7 +18,9 @@ router = APIRouter(prefix="/v1/rss", tags=["rss"])
 
 # ---------- Pydantic Schemas ----------
 class RssEntryOut(BaseModel):
-    id: str
+    id: strlocal
+    
+    
     title: Optional[str] = None
     link: Optional[str] = None
     source: Optional[str] = None
@@ -99,7 +101,7 @@ def list_entries(
     q: Optional[str] = Query(None, description="간단 검색(title, link에 contains)"),
     db = Depends(mongo.get_database),
 ):
-    col = db["rss_entries"]
+    col = db["entries"]
     query: Dict[str, Any] = {}
 
     if feed_id:
@@ -134,7 +136,7 @@ def list_entries(
 
 @router.get("/entries/{entry_id}", response_model=RssEntryOut)
 def get_entry(entry_id: str = Path(...), db = Depends(mongo.get_database)):
-    col = db["rss_entries"]
+    col = db["entries"]
     doc = col.find_one({"_id": _oid(entry_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="entry not found")
@@ -150,7 +152,7 @@ def process_entry(
     """
     단일 RSS 엔트리를 추출 파이프라인으로 처리하고, 결과를 articles에 upsert + processed=true 표시
     """
-    rss_col = db["rss_entries"]
+    rss_col = db["entries"]
     art_col = db["articles"]
 
     doc = rss_col.find_one({"_id": _oid(entry_id)})
@@ -192,7 +194,7 @@ def process_feed(
     """
     feed_id에 속한 엔트리들을 순차 처리(동기). 대량이면 배치 잡으로 전환 권장.
     """
-    rss_col = db["rss_entries"]
+    rss_col = db["entries"]
     art_col = db["articles"]
 
     query = {"$or": [{"feed_id": feed_id}, {"feed": feed_id}]}
@@ -232,7 +234,7 @@ def process_all_entries(
     """
     조건 기반 배치 처리(동기). 트래픽이 많다면 잡/큐로 넘기는 걸 권장.
     """
-    rss_col = db["rss_entries"]
+    rss_col = db["entries"]
     art_col = db["articles"]
 
     query: Dict[str, Any] = {}

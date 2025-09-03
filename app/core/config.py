@@ -26,12 +26,12 @@ class Settings(BaseSettings):
     MONGO_DB: str = "redfin"
     MONGO_COLLECTION: str = "rss_all_entries"
     
-    MONGO_BASE_URI: str = os.getenv("MONGO_BASE_URI", "mongodb://admin:Redfin7620!@localhost:27017")
-    MONGO_LOCAL_URI: str = os.getenv("MONGO_LOCAL_URI", "mongodb://admin:Redfin7620!@localhost:27017")
+    MONGO_BASE_URI: str = os.getenv("MONGO_BASE_URI", "mongodb://admin:Redfin7620!@192.168.0.123:27017")
+    MONGO_LOCAL_URI: str = os.getenv("MONGO_LOCAL_URI", "mongodb://admin:Redfin7620!@192.168.0.123:27017")
     MONGO_REMOTE_URI: str = os.getenv("MONGO_REMOTE_URI", "mongodb://100.97.183.123:27017")
     MONGO_SERVERS: dict = {
         "local": {
-            "base_url": os.getenv("MONGO_SERVERS_LOCAL_BASE_URL", "mongodb://admin:Redfin7620!@localhost:27017"),
+            "base_url": os.getenv("MONGO_SERVERS_LOCAL_BASE_URL", "mongodb://admin:Redfin7620!@192.168.0.123:27017"),
         },
         "remote": {
             "base_url": os.getenv("MONGO_SERVERS_REMOTE_BASE_URL", "mongodb://100.97.183.123:27017"),
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     }
 
     # 4. Elasticsearch 설정
-    ES_HOST: str = os.getenv("ES_HOST", "http://localhost:9200")
+    ES_HOST: str = os.getenv("ES_HOST", "http://192.168.0.123:9200")
     ES_AUTH: tuple = (os.getenv("ES_USER", "elastic"), os.getenv("ES_PASSWORD", "elastic"))
     ES_INDEX_NAME: str = os.getenv("ES_INDEX_NAME", "article_recommender")
     ES_USER: str = os.getenv("ES_USER", "elastic")
