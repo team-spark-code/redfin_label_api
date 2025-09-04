@@ -18,7 +18,7 @@ router = APIRouter(prefix="/v1/rss", tags=["rss"])
 
 # ---------- Pydantic Schemas ----------
 class RssEntryOut(BaseModel):
-    id: strlocal
+    id: str
     
     
     title: Optional[str] = None
