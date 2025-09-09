@@ -1,0 +1,14 @@
+{
+    "org": [
+        "OpenAI","Anthropic","Google","Google DeepMind","DeepMind","xAI","Microsoft","NVIDIA","Meta",
+        "Amazon","AWS","Apple","IBM","Oracle","Salesforce","Databricks","Snowflake","Intel","AMD",
+        "LY Corporation","Yahoo Japan","LINE","Naver","LG","LG CNS","Upstage","Wrtn","Perplexity","Mistral"
+    ],
+    "model": ["GPT-6","GPT-5","GPT-4o","Claude","Claude 3.7","Gemini","Genie","Llama","Llama 3.2","Mixtral","Stable Diffusion","SDXL","Mistral"],
+    "product": ["ChatGPT","Copilot","Bedrock","Vertex AI","Perplexity Pro","LINE AI Assistant","Yahoo Japan Search","SeekAI"],
+    "topic": ["LLM","RAG","Multimodal","Agents","Safety","Alignment","Robotics","NLP","Vision","Speech","RLHF","Distillation","Fine-tuning","Inference","Retrieval","Evaluation","Prompt Engineering","Reasoning","Tool Use"],
+    "biz": ["M&A","Funding","Earnings","Pricing","Partnership","IPO","Acquisition","Investment","Revenue"],
+    "policy": ["Regulation","Standard","Grant","Compliance","Export Control","AI Act","Governance"],
+    "event": ["NeurIPS","ICML","ICLR","CVPR","Google I/O","WWDC","Build","re:Invent","GTC"],
+    "geo": ["US","EU","UK","Japan","Korea","China","India"]
+}

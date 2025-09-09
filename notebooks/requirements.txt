@@ -1,0 +1,12 @@
+# 키워드 추출 실험
+yake
+rake-nltk
+keybert
+sentence-transformers
+networkx
+langdetect
+scikit-learn
+pandas
+numpy
+python-dotenv
+
