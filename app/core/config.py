@@ -8,9 +8,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # 1. APP 설정
-    APP_NAME: str = "Redfin Recommendation API"
-    APP_VERSION: str = "0.1.0"
-    APP_DESCRIPTION: str = "API for recommendation"
+    APP_NAME: str = "Redfin Label & Recommendation API"
+    APP_VERSION: str = "0.2.0"
+    APP_DESCRIPTION: str = "API for label & recommendation"
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8010
     APP_DEBUG: bool = True
@@ -24,22 +24,22 @@ class Settings(BaseSettings):
 
     # 3. MongoDB 설정
     MONGO_DB: str = "redfin"
-    MONGO_COLLECTION: str = "rss_all_entries"
+    MONGO_COLLECTION: str = "entries_with_body"
     
-    MONGO_BASE_URI: str = os.getenv("MONGO_BASE_URI", "mongodb://admin:Redfin7620!@192.168.0.123:27017")
-    MONGO_LOCAL_URI: str = os.getenv("MONGO_LOCAL_URI", "mongodb://admin:Redfin7620!@192.168.0.123:27017")
-    MONGO_REMOTE_URI: str = os.getenv("MONGO_REMOTE_URI", "mongodb://100.97.183.123:27017")
+    MONGO_BASE_URI: str = os.getenv("MONGO_BASE_URI", "mongodb://admin:Redfin7620!@localhost:27017/redfin?authSource=admin")
+    MONGO_LOCAL_URI: str = os.getenv("MONGO_LOCAL_URI", "mongodb://admin:Redfin7620!@localhost:27017/redfin?authSource=admin")
+    MONGO_REMOTE_URI: str = os.getenv("MONGO_REMOTE_URI", "mongodb://100.97.183.123:27017/redfin?authSource=admin")
     MONGO_SERVERS: dict = {
         "local": {
-            "base_url": os.getenv("MONGO_SERVERS_LOCAL_BASE_URL", "mongodb://admin:Redfin7620!@192.168.0.123:27017"),
+            "base_url": os.getenv("MONGO_SERVERS_LOCAL_BASE_URL", "mongodb://admin:Redfin7620!@localhost:27017/redfin?authSource=admin"),
         },
         "remote": {
-            "base_url": os.getenv("MONGO_SERVERS_REMOTE_BASE_URL", "mongodb://100.97.183.123:27017"),
+            "base_url": os.getenv("MONGO_SERVERS_REMOTE_BASE_URL", "mongodb://100.97.183.123:27017/redfin?authSource=admin"),
         }
     }
 
     # 4. Elasticsearch 설정
-    ES_HOST: str = os.getenv("ES_HOST", "http://192.168.0.123:9200")
+    ES_HOST: str = os.getenv("ES_HOST", "http://localhost:9200")
     ES_AUTH: tuple = (os.getenv("ES_USER", "elastic"), os.getenv("ES_PASSWORD", "elastic"))
     ES_INDEX_NAME: str = os.getenv("ES_INDEX_NAME", "article_recommender")
     ES_USER: str = os.getenv("ES_USER", "elastic")

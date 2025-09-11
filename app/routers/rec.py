@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from dotenv import load_dotenv; load_dotenv()
 from typing import Optional, List, Dict, Any
 
@@ -11,9 +12,9 @@ from ..services.article_recom import ArticleService
 # Services
 mongo = MongoService()
 article_service = ArticleService(
-    es_host="http://192.168.0.123:9200",
-    es_auth=("elastic", "elastic"),
-    index_name="article_recommender"
+    es_host=os.getenv("ES_HOST", "http://localhost:9200"),
+    es_auth=(os.getenv("ES_USER", "elastic"), os.getenv("ES_PASSWORD", "elastic")),
+    index_name=os.getenv("INDEX_NAME", "article_recommender")
 )
 
 router = APIRouter(prefix="/v1/rec", tags=["recommend"])
